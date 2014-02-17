@@ -6,7 +6,11 @@
 #define ITEM	"longjump"
 
 new bool:g_bHasLJ[MAXPLAYERS+1];
-new Handle:g_hPrice, g_iPrice;
+new Handle:g_hPrice,
+	Handle:g_hDuration,
+	g_iPrice,
+	g_iDuration;
+
 new VelocityOffset_0=-1,
 	VelocityOffset_1=-1,
 	BaseVelocityOffset=-1; 
@@ -15,7 +19,7 @@ public Plugin:myinfo =
 {
 	name = "[Shop] Long Jump",
 	author = "R1KO",
-	version = "1.0"
+	version = "1.1"
 };
 
 public OnPluginStart()
@@ -23,6 +27,10 @@ public OnPluginStart()
 	g_hPrice = CreateConVar("sm_shop_longjump_price", "1000", "Стоимость longjump.");
 	g_iPrice = GetConVarInt(g_hPrice);
 	HookConVarChange(g_hPrice, OnConVarChange);
+	
+	g_hDuration = CreateConVar("sm_shop_longjump_duration", "86400", "Длительность в секундах longjump.");
+	g_iDuration = GetConVarInt(g_hDuration);
+	HookConVarChange(g_hDuration, OnConVarChange);
 
 	VelocityOffset_0 = GetSendPropOffset("CBasePlayer","m_vecVelocity[0]");
 	VelocityOffset_1 = GetSendPropOffset("CBasePlayer","m_vecVelocity[1]");
@@ -45,8 +53,15 @@ GetSendPropOffset(const String:sNetClass[], const String:sPropertyName[])
 
 public OnConVarChange(Handle:convar, const String:oldValue[], const String:newValue[])
 {
-	g_iPrice = GetConVarInt(convar);
-	Shop_SetItemPrice(CATEGORY, ITEM, g_iPrice);
+	if(convar == g_hPrice)
+	{
+		g_iPrice = GetConVarInt(convar);
+		Shop_SetItemPrice(CATEGORY, ITEM, g_iPrice);
+	} else if(convar == g_hDuration)
+	{
+		g_iDuration = GetConVarInt(g_hDuration);
+		Shop_SetItemDuration(CATEGORY, ITEM, g_iDuration);
+	}
 }
 
 public OnPluginEnd()
@@ -63,28 +78,24 @@ public OnCategoryRegistered(const String:category[], const String:name[], const 
 {
 	if (Shop_StartItem(CATEGORY, ITEM))
 	{
-		Shop_SetItemInfo("Длинные прижки", "", g_iPrice, -1, Item_Togglable);
+		Shop_SetItemInfo("Длинные прижки", "", g_iPrice, -1, Item_Togglable, g_iDuration);
 		Shop_SetItemCallbacks(OnLJUsed);
 		Shop_EndItem();
 	}
 }
 
-public OnClientDisconnect_Post(client)
-{
-	g_bHasLJ[client] = false;
-}
+public OnClientDisconnect(iClient) g_bHasLJ[iClient] = false;
+public OnClientPostAdminCheck(iClient) g_bHasLJ[iClient] = false;
 
-public ShopAction:OnLJUsed(client, const String:category[], const String:item[], itemID, bool:toggledOn)
+public ShopAction:OnLJUsed(iClient, const String:category[], const String:item[], itemID, bool:toggledOn)
 {
-	g_bHasLJ[client] = !toggledOn;
+	g_bHasLJ[iClient] = !toggledOn;
 	if (toggledOn)
 	{
 		return Shop_ToggleOff;
 	}
 	return Shop_ToggleOn;
 }
-
-public OnClientPostAdminCheck(iClient) g_bHasLJ[iClient] = false;
 
 public Action:Event_PlayerJump(Handle:event,const String:name[],bool:dontBroadcast)
 { 
