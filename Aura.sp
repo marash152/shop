@@ -124,7 +124,7 @@ public Event_OnPlayerSpawn(Handle:hEvent, const String:sName[], bool:bSilent)
 
 stock SetClientAura(iClient)
 {
-	if(g_hTimer[iClient] == INVALID_HANDLE) g_hTimer[iClient] = CreateTimer(0.05, Timer_Beacon, iClient, TIMER_REPEAT);
+	if(g_hTimer[iClient] == INVALID_HANDLE) g_hTimer[iClient] = CreateTimer(0.1, Timer_Beacon, iClient, TIMER_REPEAT);
 }
 
 public Action:Timer_Beacon(Handle:hTimer, any:iClient)
