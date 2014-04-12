@@ -8,8 +8,7 @@
 new bool:g_bHasLJ[MAXPLAYERS+1];
 new Handle:g_hPrice,
 	Handle:g_hDuration,
-	g_iPrice,
-	g_iDuration;
+	ItemId:id;
 
 new VelocityOffset_0=-1,
 	VelocityOffset_1=-1,
@@ -19,17 +18,15 @@ public Plugin:myinfo =
 {
 	name = "[Shop] Long Jump",
 	author = "R1KO",
-	version = "1.1"
+	version = "1.3"
 };
 
 public OnPluginStart()
 {
 	g_hPrice = CreateConVar("sm_shop_longjump_price", "1000", "Стоимость longjump.");
-	g_iPrice = GetConVarInt(g_hPrice);
 	HookConVarChange(g_hPrice, OnConVarChange);
 	
 	g_hDuration = CreateConVar("sm_shop_longjump_duration", "86400", "Длительность в секундах longjump.");
-	g_iDuration = GetConVarInt(g_hDuration);
 	HookConVarChange(g_hDuration, OnConVarChange);
 
 	VelocityOffset_0 = GetSendPropOffset("CBasePlayer","m_vecVelocity[0]");
@@ -40,7 +37,7 @@ public OnPluginStart()
 
 	AutoExecConfig(true, "shop_longjump", "shop");
 
-	if (Shop_IsConnected()) Shop_OnConnected();
+	if (Shop_IsStarted()) Shop_Started();
 }
 
 GetSendPropOffset(const String:sNetClass[], const String:sPropertyName[])
@@ -51,50 +48,44 @@ GetSendPropOffset(const String:sNetClass[], const String:sPropertyName[])
 	return iOffset;
 }
 
-public OnConVarChange(Handle:convar, const String:oldValue[], const String:newValue[])
+public OnConVarChange(Handle:hCvar, const String:oldValue[], const String:newValue[])
 {
-	if(convar == g_hPrice)
+	if(id != INVALID_ITEM)
 	{
-		g_iPrice = GetConVarInt(convar);
-		Shop_SetItemPrice(CATEGORY, ITEM, g_iPrice);
-	} else if(convar == g_hDuration)
-	{
-		g_iDuration = GetConVarInt(g_hDuration);
-		Shop_SetItemDuration(CATEGORY, ITEM, g_iDuration);
+		if(hCvar == g_hPrice) Shop_SetItemPrice(id, GetConVarInt(hCvar));
+		else if(hCvar == g_hDuration) Shop_SetItemValue(id, GetConVarInt(hCvar));
 	}
 }
 
-public OnPluginEnd()
-{
-	Shop_UnregisterMe();
-}
+public OnPluginEnd() Shop_UnregisterMe();
 
-public Shop_OnConnected()
+public Shop_Started()
 {
-	Shop_RegisterCategory(CATEGORY, "Способности", "", OnCategoryRegistered);
-}
-
-public OnCategoryRegistered(const String:category[], const String:name[], const String:description[])
-{
-	if (Shop_StartItem(CATEGORY, ITEM))
+	new CategoryId:category_id = Shop_RegisterCategory(CATEGORY, "Способности", "");
+	
+	if (Shop_StartItem(category_id, ITEM))
 	{
-		Shop_SetItemInfo("Длинные прижки", "", g_iPrice, -1, Item_Togglable, g_iDuration);
-		Shop_SetItemCallbacks(OnLJUsed);
+		Shop_SetInfo("Длинные прыжки", "", GetConVarInt(g_hPrice), -1, Item_Togglable, GetConVarInt(g_hDuration));
+		Shop_SetCallbacks(OnItemRegistered, OnLJUsed);
 		Shop_EndItem();
 	}
 }
 
-public OnClientDisconnect(iClient) g_bHasLJ[iClient] = false;
+public OnItemRegistered(CategoryId:category_id, const String:category[], const String:item[], ItemId:item_id) id = item_id;
+
 public OnClientPostAdminCheck(iClient) g_bHasLJ[iClient] = false;
 
-public ShopAction:OnLJUsed(iClient, const String:category[], const String:item[], itemID, bool:toggledOn)
+public ShopAction:OnLJUsed(iClient, CategoryId:category_id, const String:category[], ItemId:item_id, const String:item[], bool:isOn, bool:elapsed)
 {
-	g_bHasLJ[iClient] = !toggledOn;
-	if (toggledOn)
+	if (isOn || elapsed)
 	{
-		return Shop_ToggleOff;
+		g_bHasLJ[iClient] = false;
+		return Shop_UseOff;
 	}
-	return Shop_ToggleOn;
+
+	g_bHasLJ[iClient] = true;
+
+	return Shop_UseOn;
 }
 
 public Action:Event_PlayerJump(Handle:event,const String:name[],bool:dontBroadcast)
