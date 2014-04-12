@@ -17,12 +17,12 @@ public Plugin:myinfo =
 {
 	name = "[Shop] Aura",
 	author = "R1KO",
-	version = "1.0"
+	version = "1.1"
 };
 
 public OnPluginStart()
 {
-	if (Shop_IsConnected()) Shop_OnConnected();
+	if (Shop_IsStarted()) Shop_Started();
 }
 
 public OnMapStart() 
@@ -42,36 +42,32 @@ public OnMapStart()
 }
 
 public OnPluginEnd() Shop_UnregisterMe();
-public Shop_OnConnected()
+
+public Shop_Started()
 {
 	if (g_hKv == INVALID_HANDLE) OnMapStart();
-	
+
 	KvRewind(g_hKv);
 	decl String:sName[64], String:sDescription[64];
 	KvGetString(g_hKv, "name", sName, sizeof(sName), "Aura");
 	KvGetString(g_hKv, "description", sDescription, sizeof(sDescription));
-	
-	Shop_RegisterCategory(CATEGORY, sName, sDescription, OnCategoryRegistered);
-}
 
-public OnCategoryRegistered(const String:category[], const String:name[], const String:description[])
-{
+	new CategoryId:category_id = Shop_RegisterCategory(CATEGORY, sName, sDescription);
+
 	KvRewind(g_hKv);
-	decl String:sItem[64], iPrice, String:sName[64];
+
 	if (KvGotoFirstSubKey(g_hKv))
 	{
-		do 
+		decl iPrice;
+		do
 		{
-			if (KvGetSectionName(g_hKv, sItem, sizeof(sItem)))
+			if (KvGetSectionName(g_hKv, sName, sizeof(sName)) && Shop_StartItem(category_id, sName))
 			{
-				if (Shop_StartItem(CATEGORY, sItem))
-				{
-					iPrice = KvGetNum(g_hKv, "price", 1000);
-					KvGetString(g_hKv, "name", sName, sizeof(sName), sItem);
-					Shop_SetItemInfo(sName, "", iPrice, iPrice/2, Item_Togglable, KvGetNum(g_hKv, "duration", 604800));
-					Shop_SetItemCallbacks(OnEquipItem);
-					Shop_EndItem();
-				}
+				iPrice = KvGetNum(g_hKv, "price", 1000);
+				KvGetString(g_hKv, "name", sDescription, sizeof(sDescription), sName);
+				Shop_SetInfo(sDescription, "", iPrice, iPrice/2, Item_Togglable, KvGetNum(g_hKv, "duration", 604800));
+				Shop_SetCallbacks(_, OnEquipItem);
+				Shop_EndItem();
 			}
 		} while (KvGotoNextKey(g_hKv));
 	}
@@ -79,13 +75,16 @@ public OnCategoryRegistered(const String:category[], const String:name[], const 
 	KvRewind(g_hKv);
 }
 
-public ShopAction:OnEquipItem(iClient, const String:category[], const String:sItem[], itemID, bool:toggledOn)
+public ShopAction:OnEquipItem(iClient, CategoryId:category_id, const String:category[], ItemId:item_id, const String:sItem[], bool:isOn, bool:elapsed)
 {
-	g_bHasAura[iClient] = !toggledOn;
-	if (toggledOn) return Shop_ToggleOff;
+	if (isOn || elapsed)
+	{
+		OnClientDisconnect(iClient);
+		return Shop_UseOff;
+	}
 	
-	Shop_ToggleCategoryOff(iClient, category);
-	
+	Shop_ToggleClientCategoryOff(iClient, category_id);
+
 	if (KvJumpToKey(g_hKv, sItem, false))
 	{
 		new iColor[4];
@@ -94,9 +93,10 @@ public ShopAction:OnEquipItem(iClient, const String:category[], const String:sIt
 
 		for(new i=0; i < 4; i++) g_iClientColor[iClient][i] = iColor[i];
 		
+		g_bHasAura[iClient] = true;
 		SetClientAura(iClient);
 		
-		return Shop_ToggleOn;
+		return Shop_UseOn;
 	}
 	
 	PrintToChat(iClient, "Failed to use \"%s\"!.", sItem);
@@ -114,12 +114,12 @@ public OnClientDisconnect(iClient)
 	}
 }
 
-public OnClientPutInServer(iClient) g_bHasAura[iClient] = false;
+public OnClientPostAdminCheck(iClient) g_bHasAura[iClient] = false;
 
 public Event_OnPlayerSpawn(Handle:hEvent, const String:sName[], bool:bSilent)
 {
 	new iClient = GetClientOfUserId(GetEventInt(hEvent, "userid"));
-	if(iClient > 0 && IsPlayerAlive(iClient)) SetClientAura(iClient);
+	if(iClient > 0 && g_bHasAura[iClient] && IsPlayerAlive(iClient)) SetClientAura(iClient);
 }
 
 stock SetClientAura(iClient)
