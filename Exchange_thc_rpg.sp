@@ -1,6 +1,5 @@
 #pragma semicolon 1
 #include <sourcemod>
-#include <thc_rpg>
 #include <shop>
 
 #define CATEGORY	"thc_rpg_credits"
@@ -11,12 +10,12 @@ public Plugin:myinfo =
 {
 	name = "[Shop] Exchange thc_rpg",
 	author = "R1KO",
-	version = "1.0"
+	version = "1.2"
 };
 
 public OnPluginStart()
 {
-	if (Shop_IsConnected()) Shop_OnConnected();
+	if(Shop_IsStarted()) Shop_Started();
 }
 
 public OnMapStart() 
@@ -29,46 +28,54 @@ public OnMapStart()
 	Shop_GetCfgFile(sConfig, sizeof(sConfig), "exchange_thc_rpg.txt");
 	
 	if (!FileToKeyValues(g_hKv, sConfig)) SetFailState("Couldn't parse file %s", sConfig);
+	KvRewind(g_hKv);
 }
 
 public OnPluginEnd() Shop_UnregisterMe();
-public Shop_OnConnected() Shop_RegisterCategory(CATEGORY, "Обмен кредитов", "", OnCategoryRegistered);
 
-public OnCategoryRegistered(const String:category[], const String:name[], const String:description[])
+public Shop_Started()
 {
+	if (g_hKv == INVALID_HANDLE) OnMapStart();
+	KvRewind(g_hKv);
+	decl String:sName[64], String:sDescription[64];
+	KvGetString(g_hKv, "name", sName, sizeof(sName), "Exchange_thc_rpg");
+	KvGetString(g_hKv, "description", sDescription, sizeof(sDescription));
+	
+	new CategoryId:category_id = Shop_RegisterCategory(CATEGORY, sName, sDescription);
+	
 	KvRewind(g_hKv);
 	if (KvGotoFirstSubKey(g_hKv))
 	{
-		decl String:sItem[15];
+		decl iPrice;
 		do
 		{
-			if (KvGetSectionName(g_hKv, sItem, sizeof(sItem)))
+			if (KvGetSectionName(g_hKv, sName, sizeof(sName)))
 			{
-				if (Shop_StartItem(CATEGORY, sItem))
+				if (Shop_StartItem(category_id, sName))
 				{
-					Shop_SetItemInfo(sItem, "", (StringToInt(sItem) + KvGetNum(g_hKv, "price", 50)), -1, Item_Finite);
-					Shop_SetItemCallbacks(RawCallback, _, _, _, OnBuy);
+					iPrice = KvGetNum(g_hKv, "price", 500);
+					FormatEx(sDescription, sizeof(sDescription), "Обмен %d -> %s", iPrice, sName);
+					Shop_SetInfo(sName, sDescription, iPrice, -1, Item_BuyOnly);
+					Shop_SetCallbacks(_, _, _, _, _, _, OnBuy);
 					Shop_EndItem();
 				}
 			}
-		} while (KvGotoNextKey(g_hKv));
+		}
+		while (KvGotoNextKey(g_hKv));
 	}
+	
 	KvRewind(g_hKv);
 }
 
-public ShopAction:RawCallback(client, const String:category[], const String:item[], itemID, bool:toggledOn) {}
-
-public Action:OnBuy(client, const String:category[], const String:item[], itemID, &credits)
+public bool:OnBuy(iClient, CategoryId:category_id, const String:category[], ItemId:item_id, const String:item[], ItemType:type, price, sell_price, value)
 {
 	KvRewind(g_hKv);
 	if (KvJumpToKey(g_hKv, item, false))
 	{
-		new iNum = KvGetNum(g_hKv, "price", 50),
-			iAmount = StringToInt(item);
-		thc_rpg_SetCredits(client, iAmount);
-		Shop_RemoveCredits(client, credits);
-		PrintToChat(client, "\x04[Shop] \x01Вы купили \x04%d \x01кредитов для РПГ, за \x04%d \x01кредитов магазина. (\x04%d \x01кредитов комиссия)", iAmount, credits, iNum);
+		new iAmount = StringToInt(item);
+		ServerCommand("thc_rpg_credits add \"%N\" %d", iClient, iAmount);
+		PrintToChat(iClient, "\x04[Shop] \x01Вы купили \x04%d \x01кредитов для РПГ, за \x04%d \x01кредитов магазина. (\x04%d \x01кредитов комиссия)", iAmount, price, KvGetNum(g_hKv, "price", 500));
 	}
 	KvRewind(g_hKv);
-	return Plugin_Handled;
+	return true;
 }
