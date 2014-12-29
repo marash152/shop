@@ -122,7 +122,7 @@ public Event_OnPlayerSpawn(Handle:hEvent, const String:sName[], bool:bSilent)
 	if(iClient > 0 && g_bHasAura[iClient] && IsPlayerAlive(iClient)) SetClientAura(iClient);
 }
 
-stock SetClientAura(iClient)
+SetClientAura(iClient)
 {
 	if(g_hTimer[iClient] == INVALID_HANDLE) g_hTimer[iClient] = CreateTimer(0.1, Timer_Beacon, iClient, TIMER_REPEAT);
 }
