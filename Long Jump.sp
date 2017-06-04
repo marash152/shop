@@ -23,10 +23,10 @@ public Plugin:myinfo =
 
 public OnPluginStart()
 {
-	g_hPrice = CreateConVar("sm_shop_longjump_price", "1000", "Стоимость longjump.");
+	g_hPrice = CreateConVar("sm_shop_longjump_price", "10000", "Стоимость longjump.");
 	HookConVarChange(g_hPrice, OnConVarChange);
 	
-	g_hDuration = CreateConVar("sm_shop_longjump_duration", "86400", "Длительность в секундах longjump.");
+	g_hDuration = CreateConVar("sm_shop_longjump_duration", "604800", "Длительность в секундах longjump.");
 	HookConVarChange(g_hDuration, OnConVarChange);
 
 	VelocityOffset_0 = GetSendPropOffset("CBasePlayer","m_vecVelocity[0]");
